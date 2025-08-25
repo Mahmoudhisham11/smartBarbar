@@ -10,6 +10,7 @@ function Resete() {
     const [invoice, setInvoice] = useState(null);
     const [printers, setPrinters] = useState([]);
     const [selectedPrinter, setSelectedPrinter] = useState("");
+    const [qzLoaded, setQzLoaded] = useState(false);
 
     // تحميل الفاتورة من localStorage وتضمين مكتبة QZ Tray
     useEffect(() => {
@@ -17,28 +18,45 @@ function Resete() {
             const lastInvoice = localStorage.getItem("lastInvoice");
             if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
 
+            // تحميل مكتبة QZ Tray والتأكد من اكتمال التحميل
             const script = document.createElement("script");
             script.src = "https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js";
             script.async = true;
+            script.onload = () => {
+                setQzLoaded(true);
+            };
             document.body.appendChild(script);
         }
     }, []);
 
     // جلب قائمة الطابعات المتصلة
     const getPrinters = async () => {
+        if (!qzLoaded) {
+            alert("QZ Tray لم يتم تحميله بعد، انتظر ثواني ثم أعد المحاولة.");
+            return;
+        }
+
         try {
             await qz.websocket.connect();
             const list = await qz.printers.find();
-            setPrinters(list);
-            if (list.length > 0) setSelectedPrinter(list[0]);
+            if (list.length === 0) {
+                alert("لا توجد طابعات متصلة أو الطابعة غير متاحة.");
+            } else {
+                setPrinters(list);
+                setSelectedPrinter(list[0]);
+            }
         } catch (err) {
             console.error("خطأ في جلب الطابعات:", err);
+            alert("حدث خطأ أثناء الاتصال بـ QZ Tray. تأكد أنه شغال.");
         }
     };
 
-    // دالة الطباعة المحسنة
+    // دالة الطباعة
     const handlePrint = async () => {
-        if (!invoice || !selectedPrinter || typeof window === "undefined") return;
+        if (!invoice || !selectedPrinter || !qzLoaded) {
+            alert("الطابعة غير محددة أو QZ Tray غير جاهز.");
+            return;
+        }
 
         try {
             await qz.websocket.connect();
@@ -70,6 +88,7 @@ function Resete() {
             localStorage.removeItem("lastInvoice");
         } catch (err) {
             console.error("خطأ في الطباعة:", err);
+            alert("حدث خطأ أثناء الطباعة. تحقق من الطابعة و QZ Tray.");
         }
     };
 
