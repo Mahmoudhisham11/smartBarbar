@@ -6,22 +6,58 @@ import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 
 function Resete() {
-    const router = useRouter()
+    const router = useRouter();
     const [invoice, setInvoice] = useState(null);
 
+    // تحميل الفاتورة من localStorage
     useEffect(() => {
         if (typeof window !== "undefined") {
             const lastInvoice = localStorage.getItem("lastInvoice");
-            if (lastInvoice) {
-                setInvoice(JSON.parse(lastInvoice));
-            }
+            if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
+
+            // تضمين مكتبة QZ Tray
+            const script = document.createElement("script");
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js";
+            script.async = true;
+            document.body.appendChild(script);
         }
     }, []);
 
-    const handlePrint = () => {
-        window.print();
-        if (typeof window !== "undefined") {
+    // دالة الطباعة المحسنة
+    const handlePrint = async () => {
+        if (!invoice || typeof window === "undefined") return;
+
+        try {
+            await qz.websocket.connect();
+            const printer = await qz.printers.find("USB001 Xprinter");
+            const config = qz.configs.create(printer);
+
+            // نص الفاتورة مع تنسيق أفضل للطابعة Thermal
+            const data = [
+                '\x1B\x61\x01', // Center align
+                '********** Mahmoud Elsony **********\n',
+                '\x1B\x61\x00', // Left align
+                '------------------------------------\n',
+                `اسم العميل: ${invoice.clientName}\n`,
+                `رقم الهاتف: ${invoice.phone}\n`,
+                '------------------------------------\n',
+                'الكود | المنتج | كمية | السعر\n',
+                '------------------------------------\n',
+                ...invoice.cart.map(item => 
+                    `${item.code} | ${item.name} | ${item.quantity} | ${item.total} جنيه\n`
+                ),
+                '------------------------------------\n',
+                `الإجمالي: ${invoice.total} جنيه\n`,
+                '------------------------------------\n',
+                '\x1B\x61\x01', // Center align
+                'شكراً لتعاملكم معنا!\n',
+                '\n\n\n'
+            ];
+
+            await qz.print(config, data);
             localStorage.removeItem("lastInvoice");
+        } catch (err) {
+            console.error("خطأ في الطباعة:", err);
         }
     };
 
@@ -60,13 +96,13 @@ function Resete() {
                                 <td>{item.code}</td>
                                 <td>{item.name}</td>
                                 <td>{item.quantity}</td>
-                                <td>{item.total} جنية</td>
+                                <td>{item.total} جنيه</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colSpan={4}>الاجمالي: {invoice.total} جنية</td>
+                            <td colSpan={4}>الإجمالي: {invoice.total} جنيه</td>
                         </tr>
                     </tfoot>
                 </table>
