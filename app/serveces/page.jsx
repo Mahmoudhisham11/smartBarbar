@@ -10,11 +10,13 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   query,
   where,
   onSnapshot,
-  Timestamp
+  Timestamp,
+  increment
 } from "firebase/firestore";
 import { db } from "@/app/firebase";
 
@@ -40,21 +42,26 @@ function Services() {
     return () => unsubscribe();
   }, []);
 
-  // ✅ دالة تجيب الكود الجديد من counters
+  // ✅ دالة تجيب الكود الجديد من counters/count
   const getNextCode = async () => {
-    const counterRef = doc(db, "counters", "phones");
+    const counterRef = doc(db, "counters", "count");
     const counterSnap = await getDoc(counterRef);
 
-    if (counterSnap.exists()) {
-      const lastCode = counterSnap.data().lastCode || 1000;
-      // ✏️ تحديث العداد بعد ما نجيب الكود
-      await updateDoc(counterRef, { lastCode: lastCode + 1 });
-      return lastCode + 1;
-    } else {
-      // لو الوثيقة مش موجودة نعملها من 1000
-      await updateDoc(counterRef, { lastCode: 1000 });
+    if (!counterSnap.exists()) {
+      // لو مش موجود → يبدأ من 1000
+      await setDoc(counterRef, { lastNumber: 1000 });
       return 1000;
     }
+
+    const data = counterSnap.data();
+    const nextCode = (data.lastNumber || 1000) + 1;
+
+    // تحديث العداد (يزود 1)
+    await updateDoc(counterRef, {
+      lastNumber: increment(1),
+    });
+
+    return nextCode;
   };
 
   // ➕ إضافة خدمة جديدة

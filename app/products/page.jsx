@@ -19,7 +19,7 @@ import {
   Timestamp,
   getDoc,
   setDoc,
-  updateDoc
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -80,21 +80,23 @@ function Products() {
     return () => unsubscribe();
   }, [searchCode]);
 
-  // ✅ الحصول على الكود الجديد من counters
+  // ✅ الحصول على الكود الجديد من counters/count باستخدام lastNumber
   const getNextCode = async () => {
-    const counterRef = doc(db, "counters", "phones");
+    const counterRef = doc(db, "counters", "count");
     const counterSnap = await getDoc(counterRef);
 
-    if (counterSnap.exists()) {
-      const lastCode = counterSnap.data().lastCode || 1000;
-      const newCode = lastCode + 1;
-
-      await updateDoc(counterRef, { lastCode: newCode });
-      return newCode;
-    } else {
-      await setDoc(counterRef, { lastCode: 1000 });
+    if (!counterSnap.exists()) {
+      // لو مفيش counters → ابدأ من 1000
+      await setDoc(counterRef, { lastNumber: 1000 });
       return 1000;
     }
+
+    const lastNumber = counterSnap.data().lastNumber || 1000;
+
+    // نزود واحد ونحدث الـ counter
+    const newCode = lastNumber + 1;
+    await updateDoc(counterRef, { lastNumber: newCode });
+    return newCode;
   };
 
   // ➕ إضافة منتج جديد
@@ -116,12 +118,12 @@ function Products() {
       quantity: Number(form.quantity),
       date: Timestamp.now(),
       shop: shop,
-      userEmail: localStorage.getItem('email'),
+      userEmail: localStorage.getItem("email"),
       type: "product"
     });
 
     alert("✅ تم إضافة المنتج");
-    setForm({ name: "", buyPrice: "", sellPrice: "", quantity: ""});
+    setForm({ name: "", buyPrice: "", sellPrice: "", quantity: "" });
   };
 
   // ❌ حذف منتج

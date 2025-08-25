@@ -13,8 +13,10 @@ import {
   collection, query, where, onSnapshot, addDoc, updateDoc, doc, deleteDoc, getDocs 
 } from "firebase/firestore";
 import { db } from "@/app/firebase";
+import { useRouter } from "next/navigation";
 
 function Main() {
+  const router = useRouter()
   const [allItems, setAllItems] = useState([]); // 🆕 products + services
   const [cart, setCart] = useState([]);
   const [savePage, setSavePage] = useState(false)
@@ -30,7 +32,6 @@ function Main() {
   useEffect(() => {
     if (!shop) return;
 
-    // جلب المنتجات
     const qProd = query(collection(db, "products"), where("shop", "==", shop));
     const unsubProd = onSnapshot(qProd, (snapshot) => {
       const products = snapshot.docs.map((d) => ({ id: d.id, ...d.data(), type: "product" }));
@@ -40,7 +41,6 @@ function Main() {
       });
     });
 
-    // جلب الخدمات
     const qServ = query(collection(db, "services"), where("shop", "==", shop));
     const unsubServ = onSnapshot(qServ, (snapshot) => {
       const services = snapshot.docs.map((d) => ({ id: d.id, ...d.data(), type: "service" }));
@@ -89,12 +89,10 @@ function Main() {
 
   // ------------------ Actions ------------------
   const handleAddToCart = async (item) => {
-    // سعر نهائي
     const customPrice = toNumber(customPrices[item.id]);
-    const basePrice = toNumber(item.price || item.sellPrice); // service = price, product = sellPrice
+    const basePrice = toNumber(item.price || item.sellPrice);
     const finalPrice = customPrice > 0 ? customPrice : basePrice;
 
-    // لو المنتج من نوع product نتحقق من الكمية
     if (item.type === "product") {
       const prodQty = toNumber(item.quantity);
       const alreadyInCartQty = currentCartQtyForCode(item.code);
@@ -104,7 +102,6 @@ function Main() {
       }
     }
 
-    // لو موجود في السلة نزود الكمية
     const existing = cart.find(c => String(c.code).toLowerCase() === String(item.code).toLowerCase());
     if (existing) {
       const newQty = toNumber(existing.quantity) + 1;
@@ -128,7 +125,6 @@ function Main() {
       });
     }
 
-    // مسح سعر مخصص
     setCustomPrices(prev => {
       const updated = { ...prev };
       delete updated[item.id];
@@ -162,7 +158,7 @@ function Main() {
 
   const totalAmount = cart.reduce((acc, item) => acc + toNumber(item.total), 0);
 
-  // ------------------ حفظ التقرير ------------------
+  // ------------------ حفظ التقرير + تخزين بيانات الفاتورة ------------------
   const handleSaveReport = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -220,9 +216,15 @@ function Main() {
         shop,
       };
 
+      // حفظ التقرير في Firebase
       await addDoc(collection(db, "reports"), saleData);
 
-      // امسح السلة
+      // حفظ بيانات الفاتورة في LocalStorage للطباعة في صفحة Resete
+      if (typeof window !== "undefined") {
+        localStorage.setItem("lastInvoice", JSON.stringify(saleData));
+      }
+
+      // مسح السلة
       const qClear = query(collection(db, "cart"), where("shop", "==", shop));
       const cartSnapshot = await getDocs(qClear);
       for (const cDoc of cartSnapshot.docs) {
@@ -240,6 +242,7 @@ function Main() {
 
     setIsSaving(false);
     setSavePage(false);
+    router.push('/resete')
   };
 
   return (
@@ -284,7 +287,6 @@ function Main() {
           </div>
         </div>
         <hr />
-        {/* ✅ جدول عرض المنتجات والخدمات */}
         <div className={styles.tableContainer}>
           <table>
             <thead>
@@ -303,9 +305,7 @@ function Main() {
                   <td>{item.code}</td>
                   <td>{item.name}</td>
                   <td>{toNumber(item.sellPrice || item.price)} EGP</td>
-                  <td>
-                    {item.type === "product" ? toNumber(item.quantity) : "∞"}
-                  </td>
+                  <td>{item.type === "product" ? toNumber(item.quantity) : "∞"}</td>
                   <td>
                     <input
                       type="number"
@@ -328,7 +328,6 @@ function Main() {
         </div>
       </div>
 
-      {/* ✅ الفاتورة */}
       <div className={styles.resetContainer}>
         <div className={styles.reset}>
           <div className={styles.resetTitle}>

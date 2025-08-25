@@ -64,7 +64,8 @@ function Masrofat() {
     // تقفيل المصروفات (حذف الكل)
     const handleCloseDay = async () => {
         try {
-            const snapshot = await getDocs(collection(db, "masrofat"));
+            const q = query(collection(db, "masrofat"), where('shop', '==', shop))
+            const snapshot = await getDocs(q);
             const batchDeletes = snapshot.docs.map((docSnap) => deleteDoc(doc(db, "masrofat", docSnap.id)));
             await Promise.all(batchDeletes);
             alert("تم تقفيل المصروفات");
