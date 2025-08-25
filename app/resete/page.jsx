@@ -60,16 +60,10 @@ function Resete() {
     }
   };
 
-  // دالة الطباعة باستخدام HTML
+  // دالة الطباعة بالنص الخام لدعم العربي
   const handlePrint = async () => {
-    if (!invoice) {
-      alert("لا توجد فاتورة للطباعة.");
-      return;
-    }
-    if (!selectedPrinter) {
-      alert("يرجى اختيار طابعة.");
-      return;
-    }
+    if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
+    if (!selectedPrinter) { alert("يرجى اختيار طابعة."); return; }
 
     try {
       if (!qz.websocket.isActive()) {
@@ -77,53 +71,30 @@ function Resete() {
         setQzConnected(true);
       }
 
-      const config = qz.configs.create(selectedPrinter);
+      const config = qz.configs.create(selectedPrinter, { encoding: 'CP864' }); // دعم العربي
 
-      const html = `
-        <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right;">
-          <h2 style="text-align:center;">********** Mahmoud Elsony **********</h2>
-          <hr>
-          <p>اسم العميل: ${invoice.clientName}</p>
-          <p>رقم الهاتف: ${invoice.phone}</p>
-          <hr>
-          <table style="width:100%; border-collapse: collapse;">
-            <thead>
-              <tr>
-                <th style="border:1px solid #000;">الكود</th>
-                <th style="border:1px solid #000;">المنتج</th>
-                <th style="border:1px solid #000;">الكمية</th>
-                <th style="border:1px solid #000;">السعر</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${invoice.cart.map(item => `
-                <tr>
-                  <td style="border:1px solid #000;">${item.code}</td>
-                  <td style="border:1px solid #000;">${item.name}</td>
-                  <td style="border:1px solid #000;">${item.quantity}</td>
-                  <td style="border:1px solid #000;">${item.total} جنيه</td>
-                </tr>
-              `).join('')}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="4" style="border:1px solid #000; text-align:right;">الإجمالي: ${invoice.total} جنيه</td>
-              </tr>
-            </tfoot>
-          </table>
-          <hr>
-          <p style="text-align:center;">شكراً لتعاملكم معنا!</p>
-        </div>
-      `;
+      const data = [
+        '\x1B\x40',           // Initialize printer
+        '\x1B\x61\x01',       // Center
+        '********** Mahmoud Elsony **********\n',
+        '\x1B\x61\x00',       // Left
+        '------------------------------------\n',
+        `اسم العميل: ${invoice.clientName}\n`,
+        `رقم الهاتف: ${invoice.phone}\n`,
+        '------------------------------------\n',
+        'الكود | المنتج | كمية | السعر\n',
+        '------------------------------------\n',
+        ...invoice.cart.map(item =>
+          `${item.code} | ${item.name} | ${item.quantity} | ${item.total} جنيه\n`
+        ),
+        '------------------------------------\n',
+        `الإجمالي: ${invoice.total} جنيه\n`,
+        '------------------------------------\n',
+        '\x1B\x61\x01',       // Center
+        'شكراً لتعاملكم معنا!\n\n\n'
+      ];
 
-      await qz.print(config, [
-        {
-          type: 'html',
-          format: 'plain',
-          flavor: 'plain',
-          data: html
-        }
-      ]);
+      await qz.print(config, data);
 
       localStorage.removeItem("lastInvoice");
       alert("تمت الطباعة بنجاح!");
