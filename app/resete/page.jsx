@@ -4,6 +4,7 @@ import styles from "./styles.module.css";
 import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
+import qz from "qz-tray"; // استدعاء مكتبة QZ Tray من npm
 
 function Resete() {
     const router = useRouter();
@@ -12,38 +13,31 @@ function Resete() {
     const [selectedPrinter, setSelectedPrinter] = useState("");
     const [qzLoaded, setQzLoaded] = useState(false);
 
-    // تحميل الفاتورة وتضمين QZ Tray
     useEffect(() => {
         if (typeof window !== "undefined") {
             const lastInvoice = localStorage.getItem("lastInvoice");
             if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
 
-            // تحميل مكتبة QZ Tray
-            const script = document.createElement("script");
-            script.src = "https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js";
-            script.async = true;
-            document.body.appendChild(script);
-
-            // فحص تحميل المكتبة كل نصف ثانية
-            const checkQZ = setInterval(() => {
-                if (typeof window.qz !== "undefined") {
+            // محاولة الاتصال بـ QZ Tray عند تحميل الصفحة
+            const tryConnect = async () => {
+                try {
+                    await qz.websocket.connect();
                     setQzLoaded(true);
-                    clearInterval(checkQZ);
+                } catch (err) {
+                    console.warn("انتظر تشغيل QZ Tray على الجهاز:", err);
                 }
-            }, 500);
-
-            return () => clearInterval(checkQZ);
+            };
+            tryConnect();
         }
     }, []);
 
-    // جلب قائمة الطابعات
+    // جلب قائمة الطابعات المتصلة
     const getPrinters = async () => {
         try {
             if (!qzLoaded) {
-                alert("انتظر قليلاً حتى يتم تحميل QZ Tray.");
+                alert("يرجى التأكد من تشغيل QZ Tray على جهازك.");
                 return;
             }
-            await qz.websocket.connect();
             const list = await qz.printers.find();
             setPrinters(list);
             if (list.length > 0) setSelectedPrinter(list[0]);
@@ -52,19 +46,17 @@ function Resete() {
         }
     };
 
-    // دالة الطباعة عبر QZ Tray
+    // دالة الطباعة
     const handlePrint = async () => {
-        if (!invoice || !selectedPrinter || typeof window === "undefined") return;
+        if (!invoice || !selectedPrinter) return;
 
         try {
-            await qz.websocket.connect();
-            const printer = await qz.printers.find(selectedPrinter);
-            const config = qz.configs.create(printer);
+            const config = qz.configs.create(selectedPrinter);
 
             const data = [
-                '\x1B\x61\x01', // Center align
+                '\x1B\x61\x01', // center
                 '********** Mahmoud Elsony **********\n',
-                '\x1B\x61\x00', // Left align
+                '\x1B\x61\x00', // left
                 '------------------------------------\n',
                 `اسم العميل: ${invoice.clientName}\n`,
                 `رقم الهاتف: ${invoice.phone}\n`,
@@ -77,9 +69,8 @@ function Resete() {
                 '------------------------------------\n',
                 `الإجمالي: ${invoice.total} جنيه\n`,
                 '------------------------------------\n',
-                '\x1B\x61\x01', // Center align
-                'شكراً لتعاملكم معنا!\n',
-                '\n\n\n'
+                '\x1B\x61\x01', // center
+                'شكراً لتعاملكم معنا!\n\n\n'
             ];
 
             await qz.print(config, data);
@@ -110,8 +101,8 @@ function Resete() {
             </div>
 
             <div style={{ margin: '10px 0' }}>
-                <button onClick={getPrinters} disabled={!qzLoaded}>
-                    {qzLoaded ? "جلب الطابعات المتصلة" : "جارٍ تحميل QZ Tray..."}
+                <button onClick={getPrinters}>
+                    جلب الطابعات المتصلة
                 </button>
                 {printers.length > 0 && (
                     <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
