@@ -8,14 +8,15 @@ import { useRouter } from "next/navigation";
 function Resete() {
     const router = useRouter();
     const [invoice, setInvoice] = useState(null);
+    const [printers, setPrinters] = useState([]);
+    const [selectedPrinter, setSelectedPrinter] = useState("");
 
-    // تحميل الفاتورة من localStorage
+    // تحميل الفاتورة من localStorage وتضمين مكتبة QZ Tray
     useEffect(() => {
         if (typeof window !== "undefined") {
             const lastInvoice = localStorage.getItem("lastInvoice");
             if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
 
-            // تضمين مكتبة QZ Tray
             const script = document.createElement("script");
             script.src = "https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js";
             script.async = true;
@@ -23,16 +24,27 @@ function Resete() {
         }
     }, []);
 
+    // جلب قائمة الطابعات المتصلة
+    const getPrinters = async () => {
+        try {
+            await qz.websocket.connect();
+            const list = await qz.printers.find();
+            setPrinters(list);
+            if (list.length > 0) setSelectedPrinter(list[0]);
+        } catch (err) {
+            console.error("خطأ في جلب الطابعات:", err);
+        }
+    };
+
     // دالة الطباعة المحسنة
     const handlePrint = async () => {
-        if (!invoice || typeof window === "undefined") return;
+        if (!invoice || !selectedPrinter || typeof window === "undefined") return;
 
         try {
             await qz.websocket.connect();
-            const printer = await qz.printers.find("USB001 Xprinter");
+            const printer = await qz.printers.find(selectedPrinter);
             const config = qz.configs.create(printer);
 
-            // نص الفاتورة مع تنسيق أفضل للطابعة Thermal
             const data = [
                 '\x1B\x61\x01', // Center align
                 '********** Mahmoud Elsony **********\n',
@@ -78,6 +90,17 @@ function Resete() {
             <div className={styles.content}>
                 <strong>اسم العميل: {invoice.clientName}</strong>
                 <strong>رقم الهاتف: {invoice.phone}</strong>
+            </div>
+
+            <div style={{ margin: '10px 0' }}>
+                <button onClick={getPrinters}>جلب الطابعات المتصلة</button>
+                {printers.length > 0 && (
+                    <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
+                        {printers.map((p, idx) => (
+                            <option key={idx} value={p}>{p}</option>
+                        ))}
+                    </select>
+                )}
             </div>
 
             <div className={styles.tableContainer}>
