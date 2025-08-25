@@ -6,89 +6,22 @@ import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 
 function Resete() {
-    const router = useRouter();
+    const router = useRouter()
     const [invoice, setInvoice] = useState(null);
-    const [printers, setPrinters] = useState([]);
-    const [selectedPrinter, setSelectedPrinter] = useState("");
-    const [qzLoaded, setQzLoaded] = useState(false);
 
-    // تحميل الفاتورة من localStorage وتضمين مكتبة QZ Tray
     useEffect(() => {
         if (typeof window !== "undefined") {
             const lastInvoice = localStorage.getItem("lastInvoice");
-            if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
-
-            // تحميل مكتبة QZ Tray والتأكد من اكتمال التحميل
-            const script = document.createElement("script");
-            script.src = "https://cdnjs.cloudflare.com/ajax/libs/qz-tray/2.1.0/qz-tray.js";
-            script.async = true;
-            script.onload = () => {
-                setQzLoaded(true);
-            };
-            document.body.appendChild(script);
+            if (lastInvoice) {
+                setInvoice(JSON.parse(lastInvoice));
+            }
         }
     }, []);
 
-    // جلب قائمة الطابعات المتصلة
-    const getPrinters = async () => {
-        if (!qzLoaded) {
-            alert("QZ Tray لم يتم تحميله بعد، انتظر ثواني ثم أعد المحاولة.");
-            return;
-        }
-
-        try {
-            await qz.websocket.connect();
-            const list = await qz.printers.find();
-            if (list.length === 0) {
-                alert("لا توجد طابعات متصلة أو الطابعة غير متاحة.");
-            } else {
-                setPrinters(list);
-                setSelectedPrinter(list[0]);
-            }
-        } catch (err) {
-            console.error("خطأ في جلب الطابعات:", err);
-            alert("حدث خطأ أثناء الاتصال بـ QZ Tray. تأكد أنه شغال.");
-        }
-    };
-
-    // دالة الطباعة
-    const handlePrint = async () => {
-        if (!invoice || !selectedPrinter || !qzLoaded) {
-            alert("الطابعة غير محددة أو QZ Tray غير جاهز.");
-            return;
-        }
-
-        try {
-            await qz.websocket.connect();
-            const printer = await qz.printers.find(selectedPrinter);
-            const config = qz.configs.create(printer);
-
-            const data = [
-                '\x1B\x61\x01', // Center align
-                '********** Mahmoud Elsony **********\n',
-                '\x1B\x61\x00', // Left align
-                '------------------------------------\n',
-                `اسم العميل: ${invoice.clientName}\n`,
-                `رقم الهاتف: ${invoice.phone}\n`,
-                '------------------------------------\n',
-                'الكود | المنتج | كمية | السعر\n',
-                '------------------------------------\n',
-                ...invoice.cart.map(item => 
-                    `${item.code} | ${item.name} | ${item.quantity} | ${item.total} جنيه\n`
-                ),
-                '------------------------------------\n',
-                `الإجمالي: ${invoice.total} جنيه\n`,
-                '------------------------------------\n',
-                '\x1B\x61\x01', // Center align
-                'شكراً لتعاملكم معنا!\n',
-                '\n\n\n'
-            ];
-
-            await qz.print(config, data);
+    const handlePrint = () => {
+        window.print();
+        if (typeof window !== "undefined") {
             localStorage.removeItem("lastInvoice");
-        } catch (err) {
-            console.error("خطأ في الطباعة:", err);
-            alert("حدث خطأ أثناء الطباعة. تحقق من الطابعة و QZ Tray.");
         }
     };
 
@@ -111,17 +44,6 @@ function Resete() {
                 <strong>رقم الهاتف: {invoice.phone}</strong>
             </div>
 
-            <div style={{ margin: '10px 0' }}>
-                <button onClick={getPrinters}>جلب الطابعات المتصلة</button>
-                {printers.length > 0 && (
-                    <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
-                        {printers.map((p, idx) => (
-                            <option key={idx} value={p}>{p}</option>
-                        ))}
-                    </select>
-                )}
-            </div>
-
             <div className={styles.tableContainer}>
                 <table>
                     <thead>
@@ -138,13 +60,13 @@ function Resete() {
                                 <td>{item.code}</td>
                                 <td>{item.name}</td>
                                 <td>{item.quantity}</td>
-                                <td>{item.total} جنيه</td>
+                                <td>{item.total} جنية</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colSpan={4}>الإجمالي: {invoice.total} جنيه</td>
+                            <td colSpan={4}>الاجمالي: {invoice.total} جنية</td>
                         </tr>
                     </tfoot>
                 </table>
