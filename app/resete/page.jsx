@@ -4,55 +4,81 @@ import styles from "./styles.module.css";
 import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
-import qz from "qz-tray"; // استدعاء مكتبة QZ Tray من npm
+import qz from "qz-tray";
 
 function Resete() {
     const router = useRouter();
     const [invoice, setInvoice] = useState(null);
     const [printers, setPrinters] = useState([]);
     const [selectedPrinter, setSelectedPrinter] = useState("");
-    const [qzLoaded, setQzLoaded] = useState(false);
+    const [qzConnected, setQzConnected] = useState(false);
+    const [loadingPrinters, setLoadingPrinters] = useState(false);
 
+    // تحميل الفاتورة والاتصال بـ QZ Tray مرة واحدة عند تحميل الصفحة
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            const lastInvoice = localStorage.getItem("lastInvoice");
-            if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
+        if (typeof window === "undefined") return;
 
-            // محاولة الاتصال بـ QZ Tray عند تحميل الصفحة
-            const tryConnect = async () => {
-                try {
+        const lastInvoice = localStorage.getItem("lastInvoice");
+        if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
+
+        const connectQZ = async () => {
+            try {
+                if (!qz.websocket.isActive()) {
                     await qz.websocket.connect();
-                    setQzLoaded(true);
-                } catch (err) {
-                    console.warn("انتظر تشغيل QZ Tray على الجهاز:", err);
                 }
-            };
-            tryConnect();
-        }
-    }, []);
-
-    // جلب قائمة الطابعات المتصلة
-    const getPrinters = async () => {
-        try {
-            if (!qzLoaded) {
-                alert("يرجى التأكد من تشغيل QZ Tray على جهازك.");
-                return;
+                setQzConnected(true);
+            } catch (err) {
+                console.warn("يرجى تشغيل QZ Tray على جهازك:", err);
+                setQzConnected(false);
             }
+        };
+
+        connectQZ();
+
+        // إعادة الاتصال كل 5 ثواني إذا لم يكن متصل
+        const interval = setInterval(() => {
+            if (!qzConnected) connectQZ();
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [qzConnected]);
+
+    // جلب الطابعات
+    const getPrinters = async () => {
+        if (!qzConnected) {
+            alert("يرجى التأكد من تشغيل QZ Tray على جهازك.");
+            return;
+        }
+        setLoadingPrinters(true);
+        try {
             const list = await qz.printers.find();
             setPrinters(list);
-            if (list.length > 0) setSelectedPrinter(list[0]);
+            if (list.length > 0 && !selectedPrinter) setSelectedPrinter(list[0]);
         } catch (err) {
             console.error("خطأ في جلب الطابعات:", err);
+            alert("فشل جلب الطابعات، تحقق من تشغيل QZ Tray.");
+        } finally {
+            setLoadingPrinters(false);
         }
     };
 
     // دالة الطباعة
     const handlePrint = async () => {
-        if (!invoice || !selectedPrinter) return;
-
+        if (!invoice) {
+            alert("لا توجد فاتورة للطباعة.");
+            return;
+        }
+        if (!selectedPrinter) {
+            alert("يرجى اختيار طابعة.");
+            return;
+        }
         try {
-            const config = qz.configs.create(selectedPrinter);
+            if (!qz.websocket.isActive()) {
+                await qz.websocket.connect();
+                setQzConnected(true);
+            }
 
+            const config = qz.configs.create(selectedPrinter);
             const data = [
                 '\x1B\x61\x01', // center
                 '********** Mahmoud Elsony **********\n',
@@ -63,21 +89,22 @@ function Resete() {
                 '------------------------------------\n',
                 'الكود | المنتج | كمية | السعر\n',
                 '------------------------------------\n',
-                ...invoice.cart.map(item => 
+                ...invoice.cart.map(item =>
                     `${item.code} | ${item.name} | ${item.quantity} | ${item.total} جنيه\n`
                 ),
                 '------------------------------------\n',
                 `الإجمالي: ${invoice.total} جنيه\n`,
                 '------------------------------------\n',
-                '\x1B\x61\x01', // center
+                '\x1B\x61\x01',
                 'شكراً لتعاملكم معنا!\n\n\n'
             ];
 
             await qz.print(config, data);
             localStorage.removeItem("lastInvoice");
+            alert("تمت الطباعة بنجاح!");
         } catch (err) {
-            console.error("خطأ في الطباعة:", err);
-            alert("حدث خطأ أثناء الطباعة، تحقق من Console.");
+            console.error("خطأ أثناء الطباعة:", err);
+            alert("فشل الطباعة. تحقق من تشغيل QZ Tray ومن الطابعة.");
         }
     };
 
@@ -91,7 +118,7 @@ function Resete() {
                 <button onClick={() => router.push('/')} className={styles.btnBack}>رجوع</button>
                 <h2>Mahmoud Elsony</h2>
                 <div className={styles.imageContainer}>
-                    <Image src={resetImage} fill style={{objectFit: 'cover'}} alt="logo"/>
+                    <Image src={resetImage} fill style={{ objectFit: 'cover' }} alt="logo" />
                 </div>
             </div>
 
@@ -101,8 +128,8 @@ function Resete() {
             </div>
 
             <div style={{ margin: '10px 0' }}>
-                <button onClick={getPrinters}>
-                    جلب الطابعات المتصلة
+                <button onClick={getPrinters} disabled={loadingPrinters}>
+                    {loadingPrinters ? "جلب الطابعات..." : "جلب الطابعات المتصلة"}
                 </button>
                 {printers.length > 0 && (
                     <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
@@ -142,7 +169,7 @@ function Resete() {
             </div>
 
             <div className={styles.btn}>
-                <button onClick={handlePrint} disabled={!selectedPrinter}>
+                <button onClick={handlePrint} disabled={!selectedPrinter || !qzConnected}>
                     طباعة الفاتورة
                 </button>
             </div>
