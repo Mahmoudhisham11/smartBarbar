@@ -5,6 +5,7 @@ import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
+import EscPosEncoder from 'escpos-encoder';
 
 function Resete() {
   const router = useRouter();
@@ -59,7 +60,7 @@ function Resete() {
     }
   };
 
-  // Print invoice
+  // Print invoice using escpos-encoder (supports Arabic)
   const handlePrint = async () => {
     if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
     if (!selectedPrinter) { alert("يرجى اختيار الطابعة."); return; }
@@ -67,31 +68,46 @@ function Resete() {
     try {
       if (!qz.websocket.isActive()) await qz.websocket.connect();
 
-      // إنشاء الكونفيج مع UTF-8 لدعم العربي
-      const config = qz.configs.create(selectedPrinter, { encoding: 'UTF-8' });
+      const config = qz.configs.create(selectedPrinter);
 
-      const data = [
-        '\x1B\x40', // Initialize printer
-        '\x1B\x61\x01', // Center
-        '********** Mahmoud Elsony **********\n',
-        '\x1B\x61\x00', // Left
-        '------------------------------------\n',
-        `العميل: ${invoice.clientName}\n`,
-        `الهاتف: ${invoice.phone}\n`,
-        '------------------------------------\n',
-        'الكود | المنتج | الكمية | السعر\n',
-        '------------------------------------\n',
-        ...invoice.cart.map(item =>
-          `${item.code} | ${item.name} | ${item.quantity} | ${item.total} $\n`
-        ),
-        '------------------------------------\n',
-        `الإجمالي: ${invoice.total} $\n`,
-        '------------------------------------\n',
-        '\x1B\x61\x01', // Center
-        'شكراً لتعاملكم معنا!\n\n\n'
-      ];
+      const encoder = new EscPosEncoder();
+      encoder.initialize()
+        .align('center')
+        .text('********** Mahmoud Elsony **********')
+        .newline()
+        .align('left')
+        .text('------------------------------------')
+        .newline()
+        .text(`العميل: ${invoice.clientName}`)
+        .newline()
+        .text(`الهاتف: ${invoice.phone}`)
+        .newline()
+        .text('------------------------------------')
+        .newline()
+        .text('الكود | المنتج | الكمية | السعر')
+        .newline()
+        .text('------------------------------------')
+        .newline();
 
-      await qz.print(config, data);
+      invoice.cart.forEach(item => {
+        encoder.text(`${item.code} | ${item.name} | ${item.quantity} | ${item.total} $`).newline();
+      });
+
+      encoder.text('------------------------------------').newline()
+        .text(`الإجمالي: ${invoice.total} $`).newline()
+        .text('------------------------------------').newline()
+        .align('center')
+        .text('شكراً لتعاملكم معنا!')
+        .newline(3);
+
+      const encodedData = encoder.encode(); // ArrayBuffer
+
+      await qz.print(config, [{
+        type: 'raw',
+        format: 'hex',
+        data: Buffer.from(encodedData).toString('hex')
+      }]);
+
       localStorage.removeItem("lastInvoice");
       alert("تم طباعة الفاتورة بنجاح!");
     } catch (err) {
@@ -150,7 +166,7 @@ function Resete() {
           </tfoot>
         </table>
 
-        <p style={{ textAlign: 'center', marginTop: '5px' }}>شكراً لتعاملكم معنا!</p>
+        <p style={{ textAlign: 'center', marginTop: '5px'}}>شكراً لتعاملكم معنا!</p>
       </div>
 
       <div style={{ margin: '10px 0' }}>
