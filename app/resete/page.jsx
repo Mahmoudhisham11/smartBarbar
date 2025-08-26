@@ -36,7 +36,7 @@ function Resete() {
     connectQZ();
     const interval = setInterval(() => {
       if (!qzConnected) connectQZ();
-    }, 5000);
+    }, 3000); // حاول الاتصال كل 3 ثواني
 
     return () => clearInterval(interval);
   }, [qzConnected]);
@@ -60,7 +60,7 @@ function Resete() {
     }
   };
 
-  // دالة الطباعة بالنص الخام لدعم العربي
+  // دالة الطباعة بالنصوص الخام لدعم العربي والإنجليزي
   const handlePrint = async () => {
     if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
     if (!selectedPrinter) { alert("يرجى اختيار طابعة."); return; }
@@ -71,7 +71,7 @@ function Resete() {
         setQzConnected(true);
       }
 
-      const config = qz.configs.create(selectedPrinter, { encoding: 'CP864' }); // دعم العربي
+      const config = qz.configs.create(selectedPrinter, { encoding: 'CP1256' }); // دعم العربي
 
       const data = [
         '\x1B\x40',           // Initialize printer
