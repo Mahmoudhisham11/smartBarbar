@@ -14,7 +14,7 @@ function Resete() {
   const [qzConnected, setQzConnected] = useState(false);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
 
-  // تحميل الفاتورة والاتصال بـ QZ Tray
+  // Load invoice & connect QZ Tray
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -23,12 +23,10 @@ function Resete() {
 
     const connectQZ = async () => {
       try {
-        if (!qz.websocket.isActive()) {
-          await qz.websocket.connect();
-        }
+        if (!qz.websocket.isActive()) await qz.websocket.connect();
         setQzConnected(true);
       } catch (err) {
-        console.warn("يرجى تشغيل QZ Tray على جهازك:", err);
+        console.warn("Please run QZ Tray:", err);
         setQzConnected(false);
       }
     };
@@ -41,10 +39,10 @@ function Resete() {
     return () => clearInterval(interval);
   }, [qzConnected]);
 
-  // جلب الطابعات
+  // Get printers
   const getPrinters = async () => {
     if (!qzConnected) {
-      alert("يرجى التأكد من تشغيل QZ Tray على جهازك.");
+      alert("Please ensure QZ Tray is running.");
       return;
     }
     setLoadingPrinters(true);
@@ -53,88 +51,59 @@ function Resete() {
       setPrinters(list);
       if (list.length > 0 && !selectedPrinter) setSelectedPrinter(list[0]);
     } catch (err) {
-      console.error("خطأ في جلب الطابعات:", err);
-      alert("فشل جلب الطابعات، تحقق من تشغيل QZ Tray.");
+      console.error("Error fetching printers:", err);
+      alert("Failed to fetch printers. Check QZ Tray.");
     } finally {
       setLoadingPrinters(false);
     }
   };
 
-  // دالة الطباعة باستخدام HTML لدعم العربي والجداول
+  // Print invoice
   const handlePrint = async () => {
-    if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
-    if (!selectedPrinter) { alert("يرجى اختيار طابعة."); return; }
+    if (!invoice) { alert("No invoice to print."); return; }
+    if (!selectedPrinter) { alert("Please select a printer."); return; }
 
     try {
-      if (!qz.websocket.isActive()) {
-        await qz.websocket.connect();
-        setQzConnected(true);
-      }
+      if (!qz.websocket.isActive()) await qz.websocket.connect();
 
       const config = qz.configs.create(selectedPrinter);
 
-      const html = `
-        <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right;">
-          <h2 style="text-align:center;">********** Mahmoud Elsony **********</h2>
-          <hr>
-          <p>اسم العميل: ${invoice.clientName}</p>
-          <p>رقم الهاتف: ${invoice.phone}</p>
-          <hr>
-          <table style="width:100%; border-collapse: collapse;" border="1">
-            <thead>
-              <tr>
-                <th>الكود</th>
-                <th>المنتج</th>
-                <th>الكمية</th>
-                <th>السعر</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${invoice.cart.map(item => `
-                <tr>
-                  <td>${item.code}</td>
-                  <td>${item.name}</td>
-                  <td>${item.quantity}</td>
-                  <td>${item.total} جنيه</td>
-                </tr>
-              `).join('')}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="4" style="text-align:right;">الإجمالي: ${invoice.total} جنيه</td>
-              </tr>
-            </tfoot>
-          </table>
-          <hr>
-          <p style="text-align:center;">شكراً لتعاملكم معنا!</p>
-        </div>
-      `;
+      const data = [
+        '\x1B\x40', // Initialize
+        '\x1B\x61\x01', // Center
+        '********** Mahmoud Elsony **********\n',
+        '\x1B\x61\x00', // Left
+        '------------------------------------\n',
+        `Client: ${invoice.clientName}\n`,
+        `Phone: ${invoice.phone}\n`,
+        '------------------------------------\n',
+        'Code | Product | Qty | Price\n',
+        '------------------------------------\n',
+        ...invoice.cart.map(item =>
+          `${item.code} | ${item.name} | ${item.quantity} | ${item.total} $\n`
+        ),
+        '------------------------------------\n',
+        `Total: ${invoice.total} $\n`,
+        '------------------------------------\n',
+        '\x1B\x61\x01', // Center
+        'Thanks for working with us!\n\n\n'
+      ];
 
-      await qz.print(config, [
-        {
-          type: 'html',
-          format: 'plain',
-          flavor: 'plain',
-          data: html
-        }
-      ]);
-
+      await qz.print(config, data);
       localStorage.removeItem("lastInvoice");
-      alert("تمت الطباعة بنجاح!");
+      alert("Invoice printed successfully!");
     } catch (err) {
-      console.error("خطأ أثناء الطباعة:", err);
-      alert("فشل الطباعة. تحقق من تشغيل QZ Tray والطابعة.");
+      console.error("Print error:", err);
+      alert("Failed to print. Check QZ Tray and printer.");
     }
   };
 
-  if (!invoice) {
-    return <div className={styles.resete}><p>لا توجد فاتورة للعرض.</p></div>;
-  }
+  if (!invoice) return <div className={styles.resete}><p>No invoice to display.</p></div>;
 
   return (
     <div className={styles.resete}>
       <div className={styles.title}>
-        <button onClick={() => router.push('/')} className={styles.btnBack}>رجوع</button>
+        <button onClick={() => router.push('/')} className={styles.btnBack}>Back</button>
         <h2>Mahmoud Elsony</h2>
         <div className={styles.imageContainer}>
           <Image src={resetImage} fill style={{ objectFit: 'cover' }} alt="logo" />
@@ -142,19 +111,17 @@ function Resete() {
       </div>
 
       <div className={styles.content}>
-        <strong>اسم العميل: {invoice.clientName}</strong>
-        <strong>رقم الهاتف: {invoice.phone}</strong>
+        <strong>Client: {invoice.clientName}</strong>
+        <strong>Phone: {invoice.phone}</strong>
       </div>
 
       <div style={{ margin: '10px 0' }}>
         <button onClick={getPrinters} disabled={loadingPrinters}>
-          {loadingPrinters ? "جلب الطابعات..." : "جلب الطابعات المتصلة"}
+          {loadingPrinters ? "Fetching printers..." : "Get Printers"}
         </button>
         {printers.length > 0 && (
           <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
-            {printers.map((p, idx) => (
-              <option key={idx} value={p}>{p}</option>
-            ))}
+            {printers.map((p, idx) => <option key={idx} value={p}>{p}</option>)}
           </select>
         )}
       </div>
@@ -163,10 +130,10 @@ function Resete() {
         <table>
           <thead>
             <tr>
-              <th>الكود</th>
-              <th>المنتج</th>
-              <th>الكمية</th>
-              <th>السعر</th>
+              <th>Code</th>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Price</th>
             </tr>
           </thead>
           <tbody>
@@ -175,13 +142,13 @@ function Resete() {
                 <td>{item.code}</td>
                 <td>{item.name}</td>
                 <td>{item.quantity}</td>
-                <td>{item.total} جنيه</td>
+                <td>{item.total} $</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={4}>الإجمالي: {invoice.total} جنيه</td>
+              <td colSpan={4} style={{ textAlign: 'right' }}>Total: {invoice.total} $</td>
             </tr>
           </tfoot>
         </table>
@@ -189,12 +156,12 @@ function Resete() {
 
       <div className={styles.btn}>
         <button onClick={handlePrint} disabled={!selectedPrinter || !qzConnected}>
-          طباعة الفاتورة
+          Print Invoice
         </button>
       </div>
 
       <div className={styles.footer}>
-        <strong>directed by : Devori</strong>
+        <strong>directed by: Devori</strong>
       </div>
     </div>
   );
