@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import SideBar from "../SideBar/page";
 import styles from "./styles.module.css";
 import {
   addDoc,
@@ -18,6 +17,7 @@ import { db } from "@/app/firebase";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
+import SideBar from "@/components/SideBar/page";
 
 export default function Main() {
   const [products, setProducts] = useState([]);
@@ -129,7 +129,7 @@ export default function Main() {
 
   return (
     <div className={styles.container}>
-      <SideBar />
+      <SideBar/>
       <div className={styles.content}>
         <h2>المنتجات</h2>
         <div className={styles.products}>
