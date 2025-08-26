@@ -1,11 +1,10 @@
 'use client';
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import styles from "./styles.module.css";
 import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
-import { toPng } from 'html-to-image';
 
 function Resete() {
   const router = useRouter();
@@ -14,8 +13,6 @@ function Resete() {
   const [selectedPrinter, setSelectedPrinter] = useState("");
   const [qzConnected, setQzConnected] = useState(false);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
-
-  const invoiceRef = useRef(null);
 
   // Load invoice & connect QZ Tray
   useEffect(() => {
@@ -69,20 +66,32 @@ function Resete() {
 
     try {
       if (!qz.websocket.isActive()) await qz.websocket.connect();
-      const config = qz.configs.create(selectedPrinter);
 
-      // تحويل div الفاتورة لصورة PNG بحجم مناسب للطابعة
-      const dataUrl = await toPng(invoiceRef.current, {
-        width: 384, // عرض الطابعة الحرارية
-        style: { transform: 'scale(1)', transformOrigin: 'top left', fontFamily: 'Arial' }
-      });
+      // إنشاء الكونفيج مع UTF-8 لدعم العربي
+      const config = qz.configs.create(selectedPrinter, { encoding: 'UTF-8' });
 
-      await qz.print(config, [{
-        type: 'image',
-        format: 'png',
-        data: dataUrl
-      }]);
+      const data = [
+        '\x1B\x40', // Initialize printer
+        '\x1B\x61\x01', // Center
+        '********** Mahmoud Elsony **********\n',
+        '\x1B\x61\x00', // Left
+        '------------------------------------\n',
+        `العميل: ${invoice.clientName}\n`,
+        `الهاتف: ${invoice.phone}\n`,
+        '------------------------------------\n',
+        'الكود | المنتج | الكمية | السعر\n',
+        '------------------------------------\n',
+        ...invoice.cart.map(item =>
+          `${item.code} | ${item.name} | ${item.quantity} | ${item.total} $\n`
+        ),
+        '------------------------------------\n',
+        `الإجمالي: ${invoice.total} $\n`,
+        '------------------------------------\n',
+        '\x1B\x61\x01', // Center
+        'شكراً لتعاملكم معنا!\n\n\n'
+      ];
 
+      await qz.print(config, data);
       localStorage.removeItem("lastInvoice");
       alert("تم طباعة الفاتورة بنجاح!");
     } catch (err) {
@@ -103,8 +112,8 @@ function Resete() {
         </div>
       </div>
 
-      {/* فاتورة HTML */}
-      <div ref={invoiceRef} className={styles.invoice} style={{
+      {/* عرض الفاتورة على الشاشة */}
+      <div className={styles.invoice} style={{
         width: '384px', 
         fontFamily: 'Arial', 
         direction: 'rtl', 
