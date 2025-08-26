@@ -37,7 +37,7 @@ function Resete() {
       </div>
 
       {/* عرض الفاتورة على الشاشة */}
-      <div className={styles.invoice}>
+      <div className={`${styles.invoice} invoice-print`}>
         <h3 style={{ textAlign: 'center' }}>فاتورة</h3>
         <p><strong>العميل:</strong> {invoice.clientName}</p>
         <p><strong>الهاتف:</strong> {invoice.phone}</p>
@@ -69,6 +69,7 @@ function Resete() {
         </table>
 
         <p style={{ textAlign: 'center', marginTop: '5px'}}>شكراً لتعاملكم معنا!</p>
+        <p style={{ textAlign: 'center', marginTop: '5px'}}>رقم المحل: 01120391795</p>
       </div>
 
       <div className={styles.btn}>

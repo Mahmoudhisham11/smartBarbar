@@ -145,12 +145,31 @@ tfoot {
 /* globals.css */
 
 /* Print styles */
+/* Print styles */
 @media print {
     body {
         background: none;
-        width: 100%;
-        min-height: auto;
         margin: 0;
         padding: 0;
     }
+
+    /* نخفي كل العناصر */
+    body * {
+        visibility: hidden;
+    }
+
+    /* نعرض الفاتورة فقط */
+    .invoice-print, .invoice-print * {
+        visibility: visible;
+    }
+
+    /* نخلي الفاتورة على حجم المحتوى */
+    .invoice-print {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: auto;
+        height: auto;
+    }
 }
+
