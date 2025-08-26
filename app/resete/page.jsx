@@ -5,7 +5,7 @@ import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
-import { toPng } from "html-to-image";
+import { toPng } from 'html-to-image';
 
 function Resete() {
   const router = useRouter();
@@ -20,29 +20,33 @@ function Resete() {
   // Load invoice & connect QZ Tray
   useEffect(() => {
     if (typeof window === "undefined") return;
+
     const lastInvoice = localStorage.getItem("lastInvoice");
     if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
 
     const connectQZ = async () => {
       try {
         if (!qz.websocket.isActive()) await qz.websocket.connect();
+        console.log("QZ Tray connected ✅");
         setQzConnected(true);
       } catch (err) {
-        console.warn("Please run QZ Tray:", err);
+        console.error("QZ Tray connection error:", err);
         setQzConnected(false);
       }
     };
 
     connectQZ();
     const interval = setInterval(() => {
-      if (!qzConnected) connectQZ();
+      if (!qz.websocket.isActive()) connectQZ();
     }, 3000);
-    return () => clearInterval(interval);
-  }, [qzConnected]);
 
+    return () => clearInterval(interval);
+  }, []);
+
+  // Get printers
   const getPrinters = async () => {
     if (!qzConnected) {
-      alert("Please ensure QZ Tray is running.");
+      alert("يرجى التأكد من تشغيل QZ Tray.");
       return;
     }
     setLoadingPrinters(true);
@@ -52,12 +56,13 @@ function Resete() {
       if (list.length > 0 && !selectedPrinter) setSelectedPrinter(list[0]);
     } catch (err) {
       console.error("Error fetching printers:", err);
-      alert("Failed to fetch printers. Check QZ Tray.");
+      alert("فشل جلب الطابعات. تحقق من QZ Tray.");
     } finally {
       setLoadingPrinters(false);
     }
   };
 
+  // Print invoice
   const handlePrint = async () => {
     if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
     if (!selectedPrinter) { alert("يرجى اختيار الطابعة."); return; }
