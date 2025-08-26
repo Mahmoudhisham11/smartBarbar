@@ -65,35 +65,40 @@ function Resete() {
   // Print invoice as image
   const handlePrint = async () => {
     if (!invoice) {
-      alert("No invoice to print.");
+      alert("لا توجد فاتورة للطباعة.");
       return;
     }
     if (!selectedPrinter) {
-      alert("Please select a printer.");
+      alert("يرجى اختيار الطابعة أولاً.");
       return;
     }
 
     try {
-      // تحويل الفاتورة لـ PNG
-      const dataUrl = await toPng(invoiceRef.current);
-      const base64Data = dataUrl.split(',')[1];
+      // تحويل الفاتورة لـ PNG مع ضبط العرض
+      const dataUrl = await toPng(invoiceRef.current, {
+        width: 384, // مثال عرض رول حراري شائع
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
+      });
 
       // إعداد الطابعة
       if (!qz.websocket.isActive()) await qz.websocket.connect();
       const config = qz.configs.create(selectedPrinter);
 
-      // الطباعة
+      // الطباعة كصورة
       await qz.print(config, [{
-        type: 'raw',
-        format: 'base64',
-        data: base64Data
+        type: 'image',
+        format: 'png',
+        data: dataUrl
       }]);
 
       localStorage.removeItem("lastInvoice");
-      alert("Invoice printed successfully!");
+      alert("تم طباعة الفاتورة بنجاح!");
     } catch (err) {
       console.error("Print error:", err);
-      alert("Failed to print. Check QZ Tray and printer.");
+      alert("حدث خطأ أثناء الطباعة. تحقق من الطابعة وQZ Tray.");
     }
   };
 
@@ -109,33 +114,34 @@ function Resete() {
         </div>
       </div>
 
-      <div ref={invoiceRef} className={styles.invoice}>
-        <h3>فاتورة</h3>
+      {/* فاتورة HTML */}
+      <div ref={invoiceRef} className={styles.invoice} style={{ fontFamily: 'Tajawal, Cairo, sans-serif', direction: 'rtl', backgroundColor: 'white', padding: '10px' }}>
+        <h3 style={{ textAlign: 'center' }}>فاتورة</h3>
         <p><strong>العميل:</strong> {invoice.clientName}</p>
         <p><strong>الهاتف:</strong> {invoice.phone}</p>
 
-        <table>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th>الكود</th>
-              <th>المنتج</th>
-              <th>الكمية</th>
-              <th>السعر</th>
+              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>الكود</th>
+              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>المنتج</th>
+              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>الكمية</th>
+              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>السعر</th>
             </tr>
           </thead>
           <tbody>
             {invoice.cart.map((item) => (
               <tr key={item.id}>
-                <td>{item.code}</td>
-                <td>{item.name}</td>
-                <td>{item.quantity}</td>
-                <td>{item.total} $</td>
+                <td style={{ textAlign: 'right' }}>{item.code}</td>
+                <td style={{ textAlign: 'right' }}>{item.name}</td>
+                <td style={{ textAlign: 'right' }}>{item.quantity}</td>
+                <td style={{ textAlign: 'right' }}>{item.total} $</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={4} style={{ textAlign: 'right' }}>الإجمالي: {invoice.total} $</td>
+              <td colSpan={4} style={{ textAlign: 'right', borderTop: '1px solid #000' }}>الإجمالي: {invoice.total} $</td>
             </tr>
           </tfoot>
         </table>
