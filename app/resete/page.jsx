@@ -1,170 +1,181 @@
-'use client';
+"use client";
 import { useEffect, useState } from "react";
+import SideBar from "../SideBar/page";
 import styles from "./styles.module.css";
-import Image from "next/image";
-import resetImage from "../../public/images/logo.png";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import { db } from "@/app/firebase";
+import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
 
-function Resete() {
+export default function Main() {
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [clientName, setClientName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [selectedPrinter, setSelectedPrinter] = useState(null);
+
   const router = useRouter();
-  const [invoice, setInvoice] = useState(null);
-  const [printers, setPrinters] = useState([]);
-  const [selectedPrinter, setSelectedPrinter] = useState("");
-  const [qzConnected, setQzConnected] = useState(false);
-  const [loadingPrinters, setLoadingPrinters] = useState(false);
 
-  // Load invoice & connect QZ Tray
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+      const productsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setProducts(productsData);
+    });
 
-    const lastInvoice = localStorage.getItem("lastInvoice");
-    if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
+    return () => unsubscribe();
+  }, []);
 
-    const connectQZ = async () => {
-      try {
-        if (!qz.websocket.isActive()) await qz.websocket.connect();
-        setQzConnected(true);
-      } catch (err) {
-        console.warn("Please run QZ Tray:", err);
-        setQzConnected(false);
-      }
-    };
+  const addToCart = (product) => {
+    const existingItem = cart.find((item) => item.id === product.id);
+    if (existingItem) {
+      setCart(
+        cart.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.price }
+            : item
+        )
+      );
+    } else {
+      setCart([...cart, { ...product, quantity: 1, total: product.price }]);
+    }
+  };
 
-    connectQZ();
-    const interval = setInterval(() => {
-      if (!qzConnected) connectQZ();
-    }, 3000);
+  const removeFromCart = (id) => {
+    setCart(cart.filter((item) => item.id !== id));
+  };
 
-    return () => clearInterval(interval);
-  }, [qzConnected]);
-
-  // Get printers
-  const getPrinters = async () => {
-    if (!qzConnected) {
-      alert("Please ensure QZ Tray is running.");
+  const handlePrint = async () => {
+    if (!cart.length) {
+      alert("السلة فارغة!");
       return;
     }
-    setLoadingPrinters(true);
-    try {
-      const list = await qz.printers.find();
-      setPrinters(list);
-      if (list.length > 0 && !selectedPrinter) setSelectedPrinter(list[0]);
-    } catch (err) {
-      console.error("Error fetching printers:", err);
-      alert("Failed to fetch printers. Check QZ Tray.");
-    } finally {
-      setLoadingPrinters(false);
-    }
-  };
-
-  // Print invoice
-  const handlePrint = async () => {
-    if (!invoice) { alert("No invoice to print."); return; }
-    if (!selectedPrinter) { alert("Please select a printer."); return; }
 
     try {
-      if (!qz.websocket.isActive()) await qz.websocket.connect();
+      await qz.websocket.connect();
+      const printers = await qz.printers.find();
+      if (!printers.length) {
+        alert("لم يتم العثور على أي طابعة");
+        return;
+      }
 
-      const config = qz.configs.create(selectedPrinter);
+      const config = qz.configs.create(printers[0]); // أول طابعة
+      const total = cart.reduce((acc, item) => acc + item.total, 0);
 
-      const data = [
-        '\x1B\x40', // Initialize
-        '\x1B\x61\x01', // Center
-        '********** Mahmoud Elsony **********\n',
-        '\x1B\x61\x00', // Left
-        '------------------------------------\n',
-        `Client: ${invoice.clientName}\n`,
-        `Phone: ${invoice.phone}\n`,
-        '------------------------------------\n',
-        'Code | Product | Qty | Price\n',
-        '------------------------------------\n',
-        ...invoice.cart.map(item =>
-          `${item.code} | ${item.name} | ${item.quantity} | ${item.total} $\n`
-        ),
-        '------------------------------------\n',
-        `Total: ${invoice.total} $\n`,
-        '------------------------------------\n',
-        '\x1B\x61\x01', // Center
-        'Thanks for working with us!\n\n\n'
-      ];
+      // HTML الفاتورة
+      const htmlInvoice = `
+        <div style="font-family: Arial; font-size: 14px; text-align: center;">
+          <h3>فاتورة بيع</h3>
+          <p>العميل: ${clientName}</p>
+          <p>التليفون: ${phone}</p>
+          <hr/>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: center;">
+            <thead>
+              <tr>
+                <th style="border: 1px solid #000;">الكود</th>
+                <th style="border: 1px solid #000;">المنتج</th>
+                <th style="border: 1px solid #000;">الكمية</th>
+                <th style="border: 1px solid #000;">السعر</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${cart
+                .map(
+                  (item) => `
+                <tr>
+                  <td style="border: 1px solid #000;">${item.code}</td>
+                  <td style="border: 1px solid #000;">${item.name}</td>
+                  <td style="border: 1px solid #000;">${item.quantity}</td>
+                  <td style="border: 1px solid #000;">${item.total} $</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+          <hr/>
+          <p><b>الإجمالي: ${total} $</b></p>
+          <p>شكراً لتعاملكم معنا ❤️</p>
+        </div>
+      `;
 
-      await qz.print(config, data);
-      localStorage.removeItem("lastInvoice");
-      alert("Invoice printed successfully!");
+      await qz.print(config, [
+        {
+          type: "html",
+          format: "plain",
+          data: htmlInvoice,
+        },
+      ]);
+
+      await qz.websocket.disconnect();
     } catch (err) {
-      console.error("Print error:", err);
-      alert("Failed to print. Check QZ Tray and printer.");
+      console.error(err);
+      alert("فشل في الطباعة");
     }
   };
-
-  if (!invoice) return <div className={styles.resete}><p>No invoice to display.</p></div>;
 
   return (
-    <div className={styles.resete}>
-      <div className={styles.title}>
-        <button onClick={() => router.push('/')} className={styles.btnBack}>Back</button>
-        <h2>Mahmoud Elsony</h2>
-        <div className={styles.imageContainer}>
-          <Image src={resetImage} fill style={{ objectFit: 'cover' }} alt="logo" />
-        </div>
-      </div>
-
+    <div className={styles.container}>
+      <SideBar />
       <div className={styles.content}>
-        <strong>Client: {invoice.clientName}</strong>
-        <strong>Phone: {invoice.phone}</strong>
-      </div>
+        <h2>المنتجات</h2>
+        <div className={styles.products}>
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className={styles.product}
+              onClick={() => addToCart(product)}
+            >
+              <h4>{product.name}</h4>
+              <p>{product.price} $</p>
+            </div>
+          ))}
+        </div>
 
-      <div style={{ margin: '10px 0' }}>
-        <button onClick={getPrinters} disabled={loadingPrinters}>
-          {loadingPrinters ? "Fetching printers..." : "Get Printers"}
+        <h2>السلة</h2>
+        <div className={styles.cart}>
+          {cart.map((item) => (
+            <div key={item.id} className={styles.cartItem}>
+              <p>
+                {item.name} - {item.quantity} × {item.price} = {item.total} $
+              </p>
+              <button onClick={() => removeFromCart(item.id)}>حذف</button>
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.clientInfo}>
+          <input
+            type="text"
+            placeholder="اسم العميل"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+          />
+          <input
+            type="text"
+            placeholder="رقم الهاتف"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+
+        <button onClick={handlePrint} className={styles.printBtn}>
+          طباعة الفاتورة
         </button>
-        {printers.length > 0 && (
-          <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
-            {printers.map((p, idx) => <option key={idx} value={p}>{p}</option>)}
-          </select>
-        )}
-      </div>
-
-      <div className={styles.tableContainer}>
-        <table>
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.cart.map((item) => (
-              <tr key={item.id}>
-                <td>{item.code}</td>
-                <td>{item.name}</td>
-                <td>{item.quantity}</td>
-                <td>{item.total} $</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={4} style={{ textAlign: 'right' }}>Total: {invoice.total} $</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <div className={styles.btn}>
-        <button onClick={handlePrint} disabled={!selectedPrinter || !qzConnected}>
-          Print Invoice
-        </button>
-      </div>
-
-      <div className={styles.footer}>
-        <strong>directed by: Devori</strong>
       </div>
     </div>
   );
 }
-
-export default Resete;
