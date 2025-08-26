@@ -101,7 +101,8 @@
 
 /* Print styles */
 @media print {
-    :global(body), .resete {
+
+    .resete {
         background: none;
         width: 100%;
         min-height: auto;
