@@ -16,7 +16,7 @@ function Resete() {
   const [qzConnected, setQzConnected] = useState(false);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
 
-  const invoiceRef = useRef(null); // div الفاتورة
+  const invoiceRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -80,11 +80,10 @@ function Resete() {
       if (!qz.websocket.isActive()) await qz.websocket.connect();
       const config = qz.configs.create(selectedPrinter);
 
-      await qz.print(config, [{
-        type: 'image',
-        format: 'png',
-        data: dataUrl
-      }]);
+      // تحويل صورة PNG لـ Base64 للطباعة كـ raw ESC/POS
+      const rawData = [{ type: 'raw', format: 'base64', data: dataUrl.split(',')[1] }];
+
+      await qz.print(config, rawData);
 
       localStorage.removeItem("lastInvoice");
       alert("تم طباعة الفاتورة بنجاح!");
@@ -106,7 +105,6 @@ function Resete() {
         </div>
       </div>
 
-      {/* فاتورة HTML */}
       <div ref={invoiceRef} className={styles.invoice} style={{ fontFamily: 'Tajawal, Cairo, sans-serif', direction: 'rtl', backgroundColor: 'white', padding: '10px' }}>
         <h3 style={{ textAlign: 'center' }}>فاتورة</h3>
         <p><strong>العميل:</strong> {invoice.clientName}</p>
