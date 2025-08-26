@@ -58,7 +58,7 @@ function Resete() {
     }
   };
 
-  // Print invoice
+  // Print invoice using HTML
   const handlePrint = async () => {
     if (!invoice) { alert("No invoice to print."); return; }
     if (!selectedPrinter) { alert("Please select a printer."); return; }
@@ -68,28 +68,47 @@ function Resete() {
 
       const config = qz.configs.create(selectedPrinter);
 
-      const data = [
-        '\x1B\x40', // Initialize
-        '\x1B\x61\x01', // Center
-        '********** Mahmoud Elsony **********\n',
-        '\x1B\x61\x00', // Left
-        '------------------------------------\n',
-        `Client: ${invoice.clientName}\n`,
-        `Phone: ${invoice.phone}\n`,
-        '------------------------------------\n',
-        'Code | Product | Qty | Price\n',
-        '------------------------------------\n',
-        ...invoice.cart.map(item =>
-          `${item.code} | ${item.name} | ${item.quantity} | ${item.total} $\n`
-        ),
-        '------------------------------------\n',
-        `Total: ${invoice.total} $\n`,
-        '------------------------------------\n',
-        '\x1B\x61\x01', // Center
-        'Thanks for working with us!\n\n\n'
-      ];
+      const html = `
+        <div style="font-family: Arial, sans-serif; direction: ltr; text-align: left;">
+          <div style="text-align:center;">
+            <img src="${resetImage.src}" width="100" height="100" />
+            <h2>Mahmoud Elsony</h2>
+          </div>
+          <hr>
+          <p>Client: ${invoice.clientName}</p>
+          <p>Phone: ${invoice.phone}</p>
+          <hr>
+          <table style="width:100%; border-collapse: collapse;" border="1">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${invoice.cart.map(item => `
+                <tr>
+                  <td>${item.code}</td>
+                  <td>${item.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.total} $</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" style="text-align:right;">Total: ${invoice.total} $</td>
+              </tr>
+            </tfoot>
+          </table>
+          <hr>
+          <p style="text-align:center;">Thanks for working with us!</p>
+        </div>
+      `;
 
-      await qz.print(config, data);
+      await qz.print(config, [{ type: 'html', data: html }]);
       localStorage.removeItem("lastInvoice");
       alert("Invoice printed successfully!");
     } catch (err) {
