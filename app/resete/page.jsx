@@ -36,7 +36,7 @@ function Resete() {
     connectQZ();
     const interval = setInterval(() => {
       if (!qzConnected) connectQZ();
-    }, 3000); 
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [qzConnected]);
@@ -60,7 +60,7 @@ function Resete() {
     }
   };
 
-  // دالة الطباعة باستخدام HTML لدعم العربي والإنجليزي
+  // دالة الطباعة باستخدام HTML لدعم العربي والجداول
   const handlePrint = async () => {
     if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
     if (!selectedPrinter) { alert("يرجى اختيار طابعة."); return; }
@@ -80,28 +80,28 @@ function Resete() {
           <p>اسم العميل: ${invoice.clientName}</p>
           <p>رقم الهاتف: ${invoice.phone}</p>
           <hr>
-          <table style="width:100%; border-collapse: collapse;">
+          <table style="width:100%; border-collapse: collapse;" border="1">
             <thead>
               <tr>
-                <th style="border:1px solid #000;">الكود</th>
-                <th style="border:1px solid #000;">المنتج</th>
-                <th style="border:1px solid #000;">الكمية</th>
-                <th style="border:1px solid #000;">السعر</th>
+                <th>الكود</th>
+                <th>المنتج</th>
+                <th>الكمية</th>
+                <th>السعر</th>
               </tr>
             </thead>
             <tbody>
               ${invoice.cart.map(item => `
                 <tr>
-                  <td style="border:1px solid #000;">${item.code}</td>
-                  <td style="border:1px solid #000;">${item.name}</td>
-                  <td style="border:1px solid #000;">${item.quantity}</td>
-                  <td style="border:1px solid #000;">${item.total} جنيه</td>
+                  <td>${item.code}</td>
+                  <td>${item.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.total} جنيه</td>
                 </tr>
               `).join('')}
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="4" style="border:1px solid #000; text-align:right;">الإجمالي: ${invoice.total} جنيه</td>
+                <td colspan="4" style="text-align:right;">الإجمالي: ${invoice.total} جنيه</td>
               </tr>
             </tfoot>
           </table>
@@ -164,7 +164,7 @@ function Resete() {
           <thead>
             <tr>
               <th>الكود</th>
-              <th>الخدمة/المنتج</th>
+              <th>المنتج</th>
               <th>الكمية</th>
               <th>السعر</th>
             </tr>
