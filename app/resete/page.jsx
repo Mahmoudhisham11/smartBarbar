@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import styles from "./styles.module.css";
 import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
+import { toPng } from 'html-to-image';
 
 function Resete() {
   const router = useRouter();
@@ -15,7 +16,8 @@ function Resete() {
   const [qzConnected, setQzConnected] = useState(false);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
 
-  // Load invoice & connect QZ Tray
+  const invoiceRef = useRef(null); // div الفاتورة
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -40,7 +42,6 @@ function Resete() {
     return () => clearInterval(interval);
   }, [qzConnected]);
 
-  // Get printers
   const getPrinters = async () => {
     if (!qzConnected) {
       alert("Please ensure QZ Tray is running.");
@@ -59,7 +60,6 @@ function Resete() {
     }
   };
 
-  // Print invoice as raw ESC/POS
   const handlePrint = async () => {
     if (!invoice) {
       alert("لا توجد فاتورة للطباعة.");
@@ -71,30 +71,21 @@ function Resete() {
     }
 
     try {
+      // تحويل div الفاتورة لصورة PNG
+      const dataUrl = await toPng(invoiceRef.current, { 
+        width: 384,
+        style: { transform: 'scale(1)', transformOrigin: 'top left' }
+      });
+
       if (!qz.websocket.isActive()) await qz.websocket.connect();
       const config = qz.configs.create(selectedPrinter);
 
-      // تجهيز نص الفاتورة بصيغة raw ESC/POS
-      let data = '';
-      data += '\x1B\x40'; // Initialize printer
-      data += '\x1B\x61\x01'; // Center
-      data += '********** فاتورة **********\n';
-      data += '\x1B\x61\x00'; // Left
-      data += `العميل: ${invoice.clientName}\n`;
-      data += `الهاتف: ${invoice.phone}\n`;
-      data += '------------------------------\n';
-      data += 'الكود | المنتج | الكمية | السعر\n';
-      data += '------------------------------\n';
-      invoice.cart.forEach(item => {
-        data += `${item.code} | ${item.name} | ${item.quantity} | ${item.total}\n`;
-      });
-      data += '------------------------------\n';
-      data += `الإجمالي: ${invoice.total}\n`;
-      data += '\n\x1B\x61\x01شكراً لتعاملكم معنا!\n\n\n';
-      data += '\x1D\x56\x41'; // Cut paper
+      await qz.print(config, [{
+        type: 'image',
+        format: 'png',
+        data: dataUrl
+      }]);
 
-      // الطباعة
-      await qz.print(config, [{ type: 'raw', format: 'plain', data }]);
       localStorage.removeItem("lastInvoice");
       alert("تم طباعة الفاتورة بنجاح!");
     } catch (err) {
@@ -115,8 +106,8 @@ function Resete() {
         </div>
       </div>
 
-      {/* عرض معلومات الفاتورة */}
-      <div className={styles.invoice} style={{ fontFamily: 'Tajawal, Cairo, sans-serif', direction: 'rtl', backgroundColor: 'white', padding: '10px' }}>
+      {/* فاتورة HTML */}
+      <div ref={invoiceRef} className={styles.invoice} style={{ fontFamily: 'Tajawal, Cairo, sans-serif', direction: 'rtl', backgroundColor: 'white', padding: '10px' }}>
         <h3 style={{ textAlign: 'center' }}>فاتورة</h3>
         <p><strong>العميل:</strong> {invoice.clientName}</p>
         <p><strong>الهاتف:</strong> {invoice.phone}</p>
@@ -146,6 +137,8 @@ function Resete() {
             </tr>
           </tfoot>
         </table>
+
+        <p style={{ textAlign: 'center', marginTop: '20px' }}>شكراً لتعاملكم معنا!</p>
       </div>
 
       <div style={{ margin: '10px 0' }}>
