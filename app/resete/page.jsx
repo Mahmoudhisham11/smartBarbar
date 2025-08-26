@@ -1,12 +1,11 @@
 'use client';
-
 import { useEffect, useState, useRef } from "react";
 import styles from "./styles.module.css";
 import Image from "next/image";
 import resetImage from "../../public/images/logo.png";
 import { useRouter } from "next/navigation";
 import qz from "qz-tray";
-import { toPng } from 'html-to-image';
+import { toPng } from "html-to-image";
 
 function Resete() {
   const router = useRouter();
@@ -18,9 +17,9 @@ function Resete() {
 
   const invoiceRef = useRef(null);
 
+  // Load invoice & connect QZ Tray
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     const lastInvoice = localStorage.getItem("lastInvoice");
     if (lastInvoice) setInvoice(JSON.parse(lastInvoice));
 
@@ -38,7 +37,6 @@ function Resete() {
     const interval = setInterval(() => {
       if (!qzConnected) connectQZ();
     }, 3000);
-
     return () => clearInterval(interval);
   }, [qzConnected]);
 
@@ -61,29 +59,24 @@ function Resete() {
   };
 
   const handlePrint = async () => {
-    if (!invoice) {
-      alert("لا توجد فاتورة للطباعة.");
-      return;
-    }
-    if (!selectedPrinter) {
-      alert("يرجى اختيار الطابعة أولاً.");
-      return;
-    }
+    if (!invoice) { alert("لا توجد فاتورة للطباعة."); return; }
+    if (!selectedPrinter) { alert("يرجى اختيار الطابعة."); return; }
 
     try {
-      // تحويل div الفاتورة لصورة PNG
-      const dataUrl = await toPng(invoiceRef.current, { 
-        width: 384,
-        style: { transform: 'scale(1)', transformOrigin: 'top left' }
-      });
-
       if (!qz.websocket.isActive()) await qz.websocket.connect();
       const config = qz.configs.create(selectedPrinter);
 
-      // تحويل صورة PNG لـ Base64 للطباعة كـ raw ESC/POS
-      const rawData = [{ type: 'raw', format: 'base64', data: dataUrl.split(',')[1] }];
+      // تحويل div الفاتورة لصورة PNG بحجم مناسب للطابعة
+      const dataUrl = await toPng(invoiceRef.current, {
+        width: 384, // عرض الطابعة الحرارية
+        style: { transform: 'scale(1)', transformOrigin: 'top left', fontFamily: 'Arial' }
+      });
 
-      await qz.print(config, rawData);
+      await qz.print(config, [{
+        type: 'image',
+        format: 'png',
+        data: dataUrl
+      }]);
 
       localStorage.removeItem("lastInvoice");
       alert("تم طباعة الفاتورة بنجاح!");
@@ -105,22 +98,29 @@ function Resete() {
         </div>
       </div>
 
-      <div ref={invoiceRef} className={styles.invoice} style={{ fontFamily: 'Tajawal, Cairo, sans-serif', direction: 'rtl', backgroundColor: 'white', padding: '10px' }}>
+      {/* فاتورة HTML */}
+      <div ref={invoiceRef} className={styles.invoice} style={{
+        width: '384px', 
+        fontFamily: 'Arial', 
+        direction: 'rtl', 
+        backgroundColor: 'white', 
+        padding: '5px'
+      }}>
         <h3 style={{ textAlign: 'center' }}>فاتورة</h3>
         <p><strong>العميل:</strong> {invoice.clientName}</p>
         <p><strong>الهاتف:</strong> {invoice.phone}</p>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr>
-              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>الكود</th>
-              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>المنتج</th>
-              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>الكمية</th>
-              <th style={{ borderBottom: '1px solid #000', textAlign: 'right' }}>السعر</th>
+              <th style={{ textAlign: 'right' }}>الكود</th>
+              <th style={{ textAlign: 'right' }}>المنتج</th>
+              <th style={{ textAlign: 'right' }}>الكمية</th>
+              <th style={{ textAlign: 'right' }}>السعر</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.cart.map((item) => (
+            {invoice.cart.map(item => (
               <tr key={item.id}>
                 <td style={{ textAlign: 'right' }}>{item.code}</td>
                 <td style={{ textAlign: 'right' }}>{item.name}</td>
@@ -136,14 +136,13 @@ function Resete() {
           </tfoot>
         </table>
 
-        <p style={{ textAlign: 'center', marginTop: '20px' }}>شكراً لتعاملكم معنا!</p>
+        <p style={{ textAlign: 'center', marginTop: '5px' }}>شكراً لتعاملكم معنا!</p>
       </div>
 
       <div style={{ margin: '10px 0' }}>
         <button onClick={getPrinters} disabled={loadingPrinters}>
           {loadingPrinters ? "جاري جلب الطابعات..." : "جلب الطابعات"}
         </button>
-
         {printers.length > 0 && (
           <select value={selectedPrinter} onChange={(e) => setSelectedPrinter(e.target.value)}>
             {printers.map((p, idx) => <option key={idx} value={p}>{p}</option>)}
