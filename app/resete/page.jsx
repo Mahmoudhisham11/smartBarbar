@@ -37,7 +37,9 @@ function Resete() {
       </div>
 
       {/* عرض الفاتورة على الشاشة */}
-      <div className={`${styles.invoice} invoice-print`}>
+      <div className={styles.invoice}>
+        <h2>فاتورة مبيعات</h2>
+        <p>فاتورة عادية</p>
         <h3 style={{ textAlign: 'center' }}>فاتورة</h3>
         <p><strong>العميل:</strong> {invoice.clientName}</p>
         <p><strong>الهاتف:</strong> {invoice.phone}</p>
@@ -67,9 +69,16 @@ function Resete() {
             </tr>
           </tfoot>
         </table>
-
+        <p>احمالي الفاتورة: {invoice.total}</p>
+        <p>المدفوع: {invoice.total}</p>
+        <p>المتبقي: 0.0</p>
+        <p>عدد الاصناف:{invoice.lenth}</p>
+        <p>الرصيد السابق: 0.0</p>
+        <p>الرصيد المدفوع: {invoice.total}</p>
+        <p>اجمالي الحساب: {invoice.toal}</p>
+        <p>العنوان: شارع السجل المدني جراج محمد حسن رضوا</p>
+        <p style={{ textAlign: 'center', marginTop: '5px'}}>رقم الهاتف: 01120391795</p>
         <p style={{ textAlign: 'center', marginTop: '5px'}}>شكراً لتعاملكم معنا!</p>
-        <p style={{ textAlign: 'center', marginTop: '5px'}}>رقم المحل: 01120391795</p>
       </div>
 
       <div className={styles.btn}>
@@ -77,7 +86,7 @@ function Resete() {
       </div>
 
       <div className={styles.footer}>
-        <strong>تم التوجيه بواسطة: Devori</strong>
+        <strong>تم التوجيه بواسطة: Devoria</strong>
       </div>
     </div>
   );
